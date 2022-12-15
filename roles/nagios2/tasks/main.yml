@@ -1,0 +1,43 @@
+---
+
+- name: Install epel-release repository
+  yum: name=epel-release state=present
+
+- name: install nagios reqs
+  yum:
+    name:
+      - httpd
+      - httpd-tools
+      - php
+      - gcc
+      - glibc
+      - glibc-common
+      - gd
+      - make
+      - net-snmp
+    state: latest
+    update_cache: true
+  become: true
+
+- name: download and uncompress
+  shell: mkdir -p /opt/nagios;cd /opt/nagios;wget https://assets.nagios.com/downloads/nagioscore/releases/nagios-4.3.4.tar.gz;tar -xvf nagios-4.3.4.tar.gz
+  become: true
+
+- name: configure and make all
+  shell: cd /opt/nagios/nagios-4.3.4;./configure --with-command-group=nagcmd;make all;make install;make install-init;make install-commandmode;make install-config; make install-webconf;
+  become: true
+
+- name: user
+  command: htpasswd -b -c /usr/local/nagios/etc/htpasswd.users admin 12345
+
+- name: install nagios plugin
+  shell: cd /opt/nagios;sudo wget https://nagios-plugins.org/download/nagios-plugins-2.3.3.tar.gz;tar -zxvf nagios-plugins-2.3.3.tar.gz;
+  become: true
+
+- name: compile nagios plugin
+  shell: cd /opt/nagios/nagios-plugins-2.3.3;./configure --with-nagios-user=nagios --with-nagios-group=nagios;make;make install;
+  become: true
+
+- name: Start Nagios service
+  shell: /usr/local/nagios/bin/nagios -v /usr/local/nagios/etc/nagios.cfg;systemctl start nagios.service
+  become: true

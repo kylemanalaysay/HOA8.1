@@ -1,0 +1,75 @@
+---
+
+- name: install nagios reqs
+  apt:
+    name:
+      - autoconf
+      - gcc
+      - libc6
+      - make
+      - wget
+      - unzip
+      - libssl-dev
+      - apache2
+      - php
+      - libapache2-mod-php*
+      - libgd-dev
+      - build-essential
+    state: latest
+    update_cache: true
+  become: true
+
+- name: download and uncompress
+  shell: cd /tmp;wget https://assets.nagios.com/downloads/nagioscore/releases/nagios-4.4.3.tar.gz;tar -zxvf nagios-4.4.3.tar.gz;mv nagios-4.4.3 nagios
+  become: true
+
+- name: configure and make all
+  shell: cd /tmp/nagios;./configure --with-httpd_conf=/etc/apache2/sites-enabled/;make all;make install;make install-init;make install-config;make install commandmode;make install-webconf;
+  become: true
+
+- name: create users and groups
+  command: chdir=/tmp/nagios make install-groups-users
+  become: true
+
+- name: create nagios user homedir
+  file:
+    path: /home/nagios
+    state: directory
+    owner: nagios
+    group: nagios
+    mode: 0775
+  become: true
+
+- name: change nagios user home dir and add group members
+  command: "{{ item }}"
+  with_items:
+    - usermod --home /home/nagios nagios
+    - usermod -a -G nagios www-data
+  become: true
+
+- name: Enable apache2 modules
+  apache2_module: state=present name={{ item }}
+  with_items:
+    - cgi
+    - rewrite
+  become: true
+
+- name: Restart Apache2 service
+  service:
+    name: apache2
+    state: restarted
+  become: true
+
+- name: user
+  command: htpasswd -cb /usr/local/nagios/etc/htpasswd.users admin 12345
+
+- name: install nagios plugin
+  shell: cd /tmp;wget https://nagios-plugins.org/download/nagios-plugins-2.3.3.tar.gz;tar -zxvf nagios-plugins-2.3.3.tar.gz;
+  become: true
+
+- name: compile nagions plugin
+  shell: cd /tmp/nagios-plugins-2.3.3;./configure --with-nagios-user=nagios --with-nagios-group=nagios;make;make install;
+
+- name: Start Nagios service
+  shell: /usr/local/nagios/bin/nagios -v /usr/local/nagios/etc/nagios.cfg;systemctl start nagios;systemctl enable nagios
+  become: true
