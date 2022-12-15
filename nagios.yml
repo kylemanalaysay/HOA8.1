@@ -1,0 +1,11 @@
+---
+
+- hosts: db_servers
+  become: true
+  roles:
+    - nagios
+
+- hosts: file_servers
+  become: true
+  roles:
+    - nagios2
